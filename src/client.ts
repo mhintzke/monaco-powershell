@@ -1,90 +1,116 @@
-/* --------------------------------------------------------------------------------------------
- * Copyright (c) 2018 TypeFox GmbH (http://www.typefox.io). All rights reserved.
- * Licensed under the MIT License. See License.txt in the project root for license information.
- * ------------------------------------------------------------------------------------------ */
-import { listen, MessageConnection } from 'vscode-ws-jsonrpc/lib';
+import '@codingame/monaco-vscode-theme-defaults-default-extension';
+import '@codingame/monaco-vscode-powershell-default-extension';
+
+import * as monaco from 'monaco-editor';
+import { MonacoLanguageClient } from 'monaco-languageclient';
+import { initServices } from 'monaco-languageclient/vscode/services';
 import {
-    BaseLanguageClient, CloseAction, ErrorAction,
-    createMonacoServices, createConnection
-} from 'monaco-languageclient/lib';
-import normalizeUrl = require('normalize-url');
-const ReconnectingWebSocket = require('reconnecting-websocket');
+  BaseLanguageClient,
+  CloseAction,
+  ErrorAction,
+  MessageTransports,
+} from 'vscode-languageclient/lib/common/client.js';
+import {
+  toSocket,
+  WebSocketMessageReader,
+  WebSocketMessageWriter,
+} from 'vscode-ws-jsonrpc';
+import { ColorScheme } from 'vscode/vscode/vs/platform/theme/common/theme';
+
+import getTextmateServiceOverride
+  from '@codingame/monaco-vscode-textmate-service-override';
+import getThemeServiceOverride
+  from '@codingame/monaco-vscode-theme-service-override';
+
+await initServices({
+  serviceConfig: {
+    userServices: {
+      ...getThemeServiceOverride(),
+      ...getTextmateServiceOverride(),
+    },
+    debugLogging: true,
+    workspaceConfig: {
+      initialColorTheme: {
+        themeType: ColorScheme.LIGHT,
+      },
+    },
+  },
+});
 
 // register Monaco languages
 monaco.languages.register({
-    id: 'powershell',
-    extensions: ['.ps1', '.psd1', '.psm1'],
-    aliases: ['pwsh', 'PowerShell'],
-    mimetypes: ['text/plain'],
+  id: "powershell",
+  extensions: [".ps1", ".psd1", ".psm1"],
+  aliases: ["pwsh", "PowerShell"],
+  mimetypes: ["text/plain"],
 });
 
 // create Monaco editor
-const value = `Write-Host "Hello World!"`;
+const value = `function Verb-Noun {
+
+}`;
 const editor = monaco.editor.create(document.getElementById("container")!, {
-    model: monaco.editor.createModel(value, 'powershell', monaco.Uri.parse('inmemory://model.ps1')),
-    glyphMargin: true,
-    lightbulb: {
-        enabled: true
-    },
-    fixedOverflowWidgets: true,
-    automaticLayout: true,
-    scrollBeyondLastLine: false
+  model: monaco.editor.createModel(
+    value,
+    "powershell",
+    monaco.Uri.parse("inmemory://model.ps1")
+  ),
+  glyphMargin: true,
+  lightbulb: {},
+  fixedOverflowWidgets: true,
+  automaticLayout: true,
+  scrollBeyondLastLine: false,
 });
 
 window.onresize = () => {
-    editor.layout({ width: window.innerWidth, height: window.innerHeight });
+  editor.layout({ width: window.innerWidth, height: window.innerHeight });
 };
 
 // create the web socket
-const url = createUrl('/sampleServer')
-const webSocket = createWebSocket(url);
-// listen when the web socket is opened
-listen({
-    webSocket,
-    onConnection: connection => {
-        // create and start the language client
-        const languageClient = createLanguageClient(connection);
-        const disposable = languageClient.start();
-        connection.onClose(() => disposable.dispose());
-    }
-});
+const url = createUrl("/sampleServer");
 
-const services = createMonacoServices(editor);
-function createLanguageClient(connection: MessageConnection): BaseLanguageClient {
-    return new BaseLanguageClient({
-        name: "Monaco PowerShell",
-        clientOptions: {
-            // use a language id as a document selector
-            documentSelector: ['powershell'],
-            // disable the default error handler
-            errorHandler: {
-                error: () => ErrorAction.Continue,
-                closed: () => CloseAction.DoNotRestart
-            }
+const ws = createWebSocket(url);
+
+ws.onopen = async () => {
+  const socket = toSocket(ws);
+
+  const reader = new WebSocketMessageReader(socket);
+  const writer = new WebSocketMessageWriter(socket);
+
+  const languageClient = createLanguageClient({ reader, writer });
+  await languageClient.start();
+  reader.onClose(() => languageClient.stop());
+};
+
+function createLanguageClient(
+  connection: MessageTransports
+): BaseLanguageClient {
+  return new MonacoLanguageClient({
+    name: "Monaco PowerShell",
+    clientOptions: {
+      // use a language id as a document selector
+      documentSelector: ["powershell"],
+      // disable the default error handler
+      errorHandler: {
+        error: (_err, message, _count) => {
+          return { action: ErrorAction.Continue };
         },
-        services,
-        // create a language client connection from the JSON RPC connection on demand
-        connectionProvider: {
-            get: (errorHandler, closeHandler) => {
-                return Promise.resolve(createConnection(connection, errorHandler, closeHandler))
-            }
-        }
-    })
+        closed: () => ({ action: CloseAction.Restart }),
+      },
+    },
+    // create a language client connection from the JSON RPC connection on demand
+    connectionProvider: {
+      get: () => {
+        return Promise.resolve(connection);
+      },
+    },
+  });
 }
 
 function createUrl(path: string): string {
-    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    return normalizeUrl(`${protocol}://${location.host}${location.pathname}${path}`);
+  return 'ws://localhost:4000' + path;
 }
 
 function createWebSocket(url: string): WebSocket {
-    const socketOptions = {
-        maxReconnectionDelay: 10000,
-        minReconnectionDelay: 1000,
-        reconnectionDelayGrowFactor: 1.3,
-        connectionTimeout: 10000,
-        maxRetries: Infinity,
-        debug: false
-    };
-    return new ReconnectingWebSocket(url, undefined, socketOptions);
+  return new WebSocket(url);
 }

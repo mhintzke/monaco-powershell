@@ -1,21 +1,14 @@
 {
     "compilerOptions": {
-        "target": "es5",
-        "module": "commonjs",
-        "moduleResolution": "node",
+        "target": "ES2022",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
         "sourceMap": true,
-        "inlineSources": false,
-        "declaration": true,
-        "stripInternal": true,
-        "lib": [
-            "es2016", "dom"
-        ],
+        "lib": ["ES2022", "DOM"],
         "rootDir":"src",
         "outDir": "lib",
         "baseUrl": ".",
-        "strict": true,
-        "noImplicitReturns": true,
-        "noUnusedLocals": true
+        "skipLibCheck": true
     },
     "include": [
         "src"

@@ -1,16 +1,24 @@
-# Monaco PowerShell Editor
+# Monaco PowerShell Editor vNext
 
-VSCode's Monaco Editor + [PowerShell Editor Services](https://github.com/powershell/PowerShellEditorServices)!
+## Running PSES locally
 
-![image](https://user-images.githubusercontent.com/2644648/43245349-da6d8f50-9062-11e8-94c0-db1fb0ff3b26.png)
+> I am developing on Windows, so this shows the issue in Windows. To run the server in unix, use Dockerfile setup below.
 
-Getting started:
+1. Change `package.json` `"prepare"` statement to `npm run clean && npm run build:win` if building with Windows instead instead of unix.
+2. Run `./build.ps1`
+3. To run locally, run `npm start` to start the server on port 4000
+4. Open another terminal and run `npm run serve` to start the client on port 5555
 
-1. Clone or download the repo
-2. `./build.ps1`
-3. `npm start`
+![alt text](image.png)
 
-Shoutouts:
+## Running PSES in Docker (unix)
 
-* [VSCode's Monaco editor](https://github.com/Microsoft/monaco-editor)
-* [Monaco Language Client](https://github.com/TypeFox/monaco-languageclient)
+1. I'm running Windows locally, so to show this also happens test this in unix systems, I've created a Dockerfile to build the project in a unix environment.
+2. Run `docker build -t pses .` to build the image
+3. Run `docker run -it -p 4000:4000 pses` to start the server
+
+## Error
+
+In both cases I get errors when performing `textDocument/codeAction` and `codeLens/resolve` commands.:
+
+![alt text](image-1.png)
